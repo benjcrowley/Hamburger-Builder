@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Build a Hamburger</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <style>
+        .draggable {
+            cursor: pointer;
+            font-size: 2rem;
+            transition: transform 0.2s;
+        }
+        .draggable:hover {
+            opacity: 0.8;
+        }
+        .draggable:active {
+            opacity: 0.6;
+        }
+        .dragging {
+            opacity: 0.5;
+        }
+        .expanded {
+            transform: scale(2);
+        }
+        .burger-expanded {
+            transform: scale(3);
+        }
+        #hotDogBuilder {
+            position: relative;
+            min-height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #hotDogBuilder::before {
+            content: '🍽️';
+            position: absolute;
+            font-size: 12rem;
+            z-index: -1;
+        }
+        .hidden {
+            display: none;
+        }
+        .button {
+            background-color: #ff0000;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+        }
+        .error-message {
+            color: red;
+            font-family: Arial, sans-serif;
+        }
+
+    </style>
+</head>
+<body class="bg-yellow-400 text-red-600">
+
+    <div class="container mx-auto p-10">
+        <h1 class="text-3xl font-bold mb-8 text-center">Build Your Hamburger</h1>
+
+        <div class="flex justify-center mb-6">
+            <button id="undoButton" class="button">Undo</button>
+            <button id="tryAgainButton" class="button hidden">Try Again</button>
+        </div>
+
+
+        <p id="errorMessage" class="error-message hidden text-center">The burger is complete, you cannot undo the meat!</p>
+
+        <div class="grid md:grid-cols-2 gap-8 items-start">
+            <div id="ingredients" class="flex flex-col items-center space-y-4">
+                <div class="draggable" draggable="true">🥖</div>
+                <div class="draggable" draggable="true">🥩</div>
+                <div class="draggable" draggable="true">🍅</div>
+                <div class="draggable" draggable="true">🌿</div>
+            </div>
+
+            <div id="hotDogBuilder" class="">
+                <p id="placeholderText" class="hidden">Drag and drop items here</p>
+            </div>
+        </div>
+        
+        <p id="personalityResult" class="hidden text-center">Personality Analysis Here</p>
+    </div>
+
+    <script>
+        const originalIngredients = Array.from(document.querySelectorAll('#ingredients .draggable')).map(el => el.cloneNode(true));
+        const tryAgainButton = document.getElementById('tryAgainButton');
+        const undoButton = document.getElementById('undoButton');
+        const ingredients = document.getElementById('ingredients');
+        const hotDogBuilder = document.getElementById('hotDogBuilder');
+        const placeholderText = document.getElementById('placeholderText');
+        const errorMessage = document.getElementById('errorMessage');
+        const personalityResult = document.getElementById('personalityResult');
+        let burgerComplete = false;
+        let draggedItem = null;
+    
+        undoButton.addEventListener('click', () => {
+            if (burgerComplete) {
+                errorMessage.classList.remove('hidden');
+            } else {
+                const items = hotDogBuilder.querySelectorAll('.draggable');
+                if (items.length > 0) {
+                    const lastItem = items[items.length - 1];
+                    lastItem.classList.remove('expanded');
+                    lastItem.classList.remove('burger-expanded');
+                    ingredients.appendChild(lastItem);
+                    checkAndSwapEmojis();
+                }
+            }
+        });
+        ingredients.addEventListener('dragstart', e => {
+            if (e.target.classList.contains('draggable')) {
+                draggedItem = e.target;
+                e.target.classList.add('dragging');
+                errorMessage.classList.add('hidden');
+            }
+        });
+    
+        ingredients.addEventListener('dragend', e => {
+            if (e.target.classList.contains('draggable')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+            }
+        });
+    
+        hotDogBuilder.addEventListener('dragover', e => {
+            e.preventDefault();
+        });
+    
+        hotDogBuilder.addEventListener('drop', e => {
+            if (draggedItem) {
+                hotDogBuilder.appendChild(draggedItem);
+                draggedItem.classList.remove('dragging');
+                draggedItem.classList.add('expanded');
+                placeholderText.classList.add('hidden');
+                checkAndSwapEmojis();
+                draggedItem = null;
+            }
+        });
+        // Add event listener to the Try Again button
+        tryAgainButton.addEventListener('click', () => {
+            // Clear current ingredients
+            while (ingredients.firstChild) {
+                ingredients.removeChild(ingredients.firstChild);
+            }
+
+            // Restore original ingredients
+            originalIngredients.forEach(ingredient => {
+                ingredients.appendChild(ingredient.cloneNode(true));
+            });
+
+            // Reset the application state
+            hotDogBuilder.innerHTML = '';
+            placeholderText.classList.remove('hidden');
+            personalityResult.classList.add('hidden');
+            tryAgainButton.classList.add('hidden');
+            burgerComplete = false;
+        });
+
+    
+        function checkAndSwapEmojis() {
+            const items = hotDogBuilder.querySelectorAll('.draggable');
+            if (items.length === 4 && [...items].every(item => ['🥖', '🥩', '🍅', '🌿'].includes(item.textContent))) {
+                // Store the original order of ingredients
+                const originalIngredientOrder = Array.from(items).map(item => item.textContent);
+
+                const burgerEmoji = document.createElement('div');
+                burgerEmoji.textContent = '🍔';
+                burgerEmoji.classList.add('draggable', 'burger-expanded');
+                burgerEmoji.draggable = true;
+                hotDogBuilder.innerHTML = '';
+                hotDogBuilder.appendChild(burgerEmoji);
+                burgerComplete = true;
+
+                // Perform personality analysis with the original order of ingredients
+                performPersonalityAnalysis(originalIngredientOrder);
+            }
+        }
+
+        function performPersonalityAnalysis(ingredientOrder) {
+            console.log("Ingredient Order: ", ingredientOrder);
+
+            if (ingredientOrder.length > 0) {
+                axios.post('https://brdzkrm3fnsae6knadd47smrwe0tcmtp.lambda-url.us-east-1.on.aws/', {
+                    ingredient_order: ingredientOrder
+                }, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => {
+                    personalityResult.textContent = response.data;
+                    personalityResult.classList.remove('hidden');
+                    tryAgainButton.classList.remove('hidden');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Optionally display an error message on the page
+                });
+            }
+        }
+        
+    </script>
+    
+</body>
+</html>
